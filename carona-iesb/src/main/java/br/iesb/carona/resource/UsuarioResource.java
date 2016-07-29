@@ -53,6 +53,7 @@ public class UsuarioResource {
 		return usuarios.get(email);
 	}
 	
+	//um comentario
 
 	
 	@Produces(MediaType.APPLICATION_JSON)
