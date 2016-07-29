@@ -32,6 +32,7 @@ public class UsuarioResource {
 				return Response.serverError().entity("Email é obrigatório").build();
 			}
 			usuarios.put(usuario.getEmail(), usuario);
+			
 			return Response.ok("Usuario incluído com sucesso").build();
 		}
 		
