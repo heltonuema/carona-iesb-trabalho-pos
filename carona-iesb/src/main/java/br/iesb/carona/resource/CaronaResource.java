@@ -16,21 +16,26 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import org.json.JSONObject;
+import com.google.gson.Gson;
 
 import br.iesb.carona.core.modelo.Carona;
+import br.iesb.carona.core.modelo.CaronaPendente;
 import br.iesb.carona.core.modelo.Usuario;
 
 @Path("/caronas")
 public class CaronaResource {
 
-	private static Map<Long, Carona> caronas = new HashMap<Long, Carona>();
+	private static final Map<Long, Carona> caronas = new HashMap<Long, Carona>();
+	private static final Map<Long, CaronaPendente> caronasPendentes = new HashMap<Long, CaronaPendente>();
 	
 	@POST
 	@Path("/oferecer")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	public Response oferecerCarona(final Carona caronaNova){
+	public Response oferecerCarona(final String caronaJson){
+		
+		Gson gson = new Gson();
+		Carona caronaNova = gson.fromJson(caronaJson, Carona.class);
 		
 		boolean erro = false;
 		String erroMsg = "";
@@ -65,29 +70,31 @@ public class CaronaResource {
 		}
 		
 		Long key = System.currentTimeMillis();
+		caronaNova.setId(key);
 		
 		caronas.put(key, caronaNova);
 		
-		JSONObject retorno = new JSONObject();
-		retorno.put("keyCarona", key);
-		
-		return Response.ok(retorno).build();
-	}
-	
-	@GET
-	@Path("/lista")
-	@Produces(MediaType.APPLICATION_JSON)
-	public Response getListaCaronas(){
-		return Response.ok(caronas).build();
+		return Response.ok(gson.toJson(caronaNova)).build();
 	}
 	
 	@GET
 	@Path("/consulta")
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response consultaCaronas(@QueryParam("partida") final String partida, @QueryParam("bairroDestino") final String bairroDestino,
-			@QueryParam("localDestino")final String localDestino){
+			@QueryParam("localDestino")final String localDestino, @QueryParam("idCarona") final long idCarona){
+
+		Map<Long, Carona> filtradoId = new HashMap<Long,Carona>();
+		if(idCarona != 0l){
+			Carona filtrada = caronas.get(idCarona);
+			if(filtrada != null){
+				filtradoId.put(idCarona, filtrada);
+			}
+		}
+		else{
+			filtradoId = new HashMap<Long,Carona>(caronas);
+		}
 		
-		Map<Long, Carona> filtradoPartida = new HashMap<Long, Carona>(caronas);
+		Map<Long, Carona> filtradoPartida = new HashMap<Long, Carona>(filtradoId);
 		if(partida != null && !partida.isEmpty()){
 			for(Entry<Long,Carona>caronaEntry : caronas.entrySet()){
 				if(!partida.equalsIgnoreCase(caronaEntry.getValue().getPontoDePartida())){
@@ -118,15 +125,113 @@ public class CaronaResource {
 	}
 	
 	@POST
-	@Path("participar/{idCarona}/{idUsuario}")
+	@Path("solicitarParticipacao/{idCarona}/{idUsuario}")
 	public Response participarCarona(@PathParam("idCarona") final Long idCarona, 
 			@PathParam("idUsuario") final String idUsuario){
 		
 		Usuario usuario = UsuarioResource.getUsuario(idUsuario);
+		if(usuario == null){
+			return Response.serverError().entity("Usuário " + idUsuario + " inexistente.").build();
+		}
 		Carona carona = caronas.get(idCarona);
-		carona.incluiCaroneiro(usuario);
+		if(carona == null){
+			return Response.serverError().entity("Carona inexistente").build();
+		}
+		int totalPassageirosESolicitantes = carona.getPassageiros().size(); 
+		if(!(totalPassageirosESolicitantes < carona.getMaximoPasageiros())){
+			return Response.serverError().entity("Carona já está lotada").build();
+		}
 		
-		return Response.ok().build();
+		Usuario aprovador = carona.getMotorista();
+		
+		CaronaPendente solicitacao = new CaronaPendente();
+		solicitacao.setAprovador(aprovador.getEmail());
+		solicitacao.setSolicitante(idUsuario);
+		solicitacao.setIdCarona(carona.getId());
+				
+		List<CaronaPendente> caronasSolicitadas = getCaronasSolicitadas(idCarona);
+		
+		if(!caronasSolicitadas.isEmpty()){
+			totalPassageirosESolicitantes += caronasSolicitadas.size();
+			
+			if(!(totalPassageirosESolicitantes < carona.getMaximoPasageiros())){
+				return Response.serverError().entity("Todos os lugares já foram solicitados").build();
+			}
+			
+			for(CaronaPendente caronaSolicitada : caronasSolicitadas){
+				if(caronaSolicitada.getSolicitante().equals(idUsuario)){
+					return Response.serverError().entity("Já existe solicitação do usuário para esta carona").build();
+				}
+			}
+		}
+		
+		caronasPendentes.put(System.currentTimeMillis(), solicitacao);
+		
+		return Response.ok("Solicitação incluída com sucesso").build();
+	}
+	
+	private List<CaronaPendente> getCaronasSolicitadas(final long idCarona){
+		List<CaronaPendente> retorno = new ArrayList<CaronaPendente>();
+		for(Entry<Long, CaronaPendente>mapEntry : caronasPendentes.entrySet()){
+			if(mapEntry.getValue().getIdCarona() == idCarona){
+				retorno.add(mapEntry.getValue());
+			}
+		}
+		return retorno;
+	}
+	
+	@GET
+	@Path("/listaSolicitacoes/{idAprovador}")
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response listarSolicitacoes(@PathParam("idAprovador") final String idAprovador){
+
+		List<CaronaPendente>retorno = new ArrayList<CaronaPendente>();
+		
+		for(Entry<Long,CaronaPendente> mapEntry : caronasPendentes.entrySet()){
+			CaronaPendente caronaPendente = mapEntry.getValue();
+			if(caronaPendente.getAprovador().equals(idAprovador)){
+					retorno.add(caronaPendente);
+			}
+		}
+		
+		return Response.ok(retorno).build();
+	}
+	
+	@GET
+	@Path("/listaAguardandoAprovacao/{idSolicitante}")
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response listarAguardandoAprovacao(@PathParam("idSolicitante") final String idSolicitante){
+
+		List<CaronaPendente>retorno = new ArrayList<CaronaPendente>();
+		
+		for(Entry<Long,CaronaPendente> mapEntry : caronasPendentes.entrySet()){
+			CaronaPendente caronaPendente = mapEntry.getValue();
+			if(caronaPendente.getSolicitante().equals(idSolicitante)){
+					retorno.add(caronaPendente);
+			}
+		}
+		
+		return Response.ok(retorno).build();
+	}
+	
+	@POST
+	@Path("/despacharSolicitacao/{idCaronaPendente}/{aprovado}")
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response despacharSolicitacao(@PathParam("idCaronaPendente") final long idCaronaPendente,
+			@PathParam("aprovado")final boolean aprovado){
+		
+		String mensagemRetorno = "Solicitação de carona removida";
+		CaronaPendente caronaDespachada = caronasPendentes.get(idCaronaPendente);
+		if(aprovado){
+			Usuario caroneiroNovo = UsuarioResource.getUsuario(caronaDespachada.getSolicitante());
+			Carona carona = caronas.get(caronaDespachada.getIdCarona());
+			carona.incluiCaroneiro(caroneiroNovo);
+			mensagemRetorno = caroneiroNovo.getNome() + " incluído na carona";
+		}
+		
+		caronasPendentes.remove(idCaronaPendente);
+				
+		return Response.ok(mensagemRetorno).build();
 	}
 	
 	
