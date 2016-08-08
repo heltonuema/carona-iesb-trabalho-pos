@@ -2,6 +2,7 @@ package br.iesb.carona.resource;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -66,7 +67,7 @@ public class CaronaResource {
 			erroMsg = erroMsg + "Motorista não cadastrado. ";
 		}
 		if(erro){
-			return Response.serverError().entity(erroMsg).build();
+			throw new RuntimeException(erroMsg);
 		}
 		
 		Long key = System.currentTimeMillis();
@@ -83,42 +84,49 @@ public class CaronaResource {
 	public Response consultaCaronas(@QueryParam("partida") final String partida, @QueryParam("bairroDestino") final String bairroDestino,
 			@QueryParam("localDestino")final String localDestino, @QueryParam("idCarona") final long idCarona){
 
-		Map<Long, Carona> filtradoId = new HashMap<Long,Carona>();
+		
+		List<Carona> filtradoId = new ArrayList<Carona>();
 		if(idCarona != 0l){
 			Carona filtrada = caronas.get(idCarona);
 			if(filtrada != null){
-				filtradoId.put(idCarona, filtrada);
+				filtradoId.add(filtrada);
 			}
 		}
 		else{
-			filtradoId = new HashMap<Long,Carona>(caronas);
+			filtradoId = new ArrayList<Carona>(caronas.values());
 		}
 		
-		Map<Long, Carona> filtradoPartida = new HashMap<Long, Carona>(filtradoId);
+		List<Carona> filtradoPartida = new LinkedList<Carona>(filtradoId);
 		if(partida != null && !partida.isEmpty()){
-			for(Entry<Long,Carona>caronaEntry : caronas.entrySet()){
-				if(!partida.equalsIgnoreCase(caronaEntry.getValue().getPontoDePartida())){
-					filtradoPartida.remove(caronaEntry.getKey());
+			List<Carona> auxiliar = new LinkedList<Carona>();
+			for(Carona carona : filtradoPartida){
+				if(partida.equalsIgnoreCase(carona.getPontoDePartida())){
+					auxiliar.add(carona);
 				}
 			}
+			filtradoPartida = auxiliar;
 		}
 		
-		Map<Long, Carona> filtradoBairroDestino = new HashMap<Long, Carona>(filtradoPartida);
+		List<Carona> filtradoBairroDestino = new LinkedList<Carona>(filtradoPartida);
 		if(bairroDestino != null && !bairroDestino.isEmpty()){
-			for(Entry<Long,Carona>bairroEntry:filtradoPartida.entrySet()){
-				if(!bairroDestino.equalsIgnoreCase(bairroEntry.getValue().getDestino().getBairro())){
-					filtradoBairroDestino.remove(bairroEntry.getKey());
+			List<Carona> auxiliar = new LinkedList<Carona>();
+			for(Carona carona:filtradoPartida){
+				if(bairroDestino.equalsIgnoreCase(carona.getDestino().getBairro())){
+					auxiliar.add(carona);
 				}
 			}
+			filtradoBairroDestino = auxiliar;
 		}
 		
-		Map<Long, Carona> filtradoLocalDestino = new HashMap<Long, Carona>(filtradoBairroDestino);
+		List<Carona> filtradoLocalDestino = new LinkedList<Carona>(filtradoBairroDestino);
 		if(localDestino != null && !localDestino.isEmpty()){
-			for(Entry<Long,Carona>localEntry:filtradoBairroDestino.entrySet()){
-				if(!localDestino.equalsIgnoreCase(localEntry.getValue().getDestino().getLocal())){
-					filtradoLocalDestino.remove(localEntry.getKey());
+			List<Carona>auxiliar = new LinkedList<Carona>();
+			for(Carona carona:filtradoBairroDestino){
+				if(localDestino.equalsIgnoreCase(carona.getDestino().getLocal())){
+					auxiliar.add(carona);
 				}
 			}
+			filtradoLocalDestino = auxiliar;
 		}
 		
 		return Response.ok(filtradoLocalDestino).build();
@@ -141,6 +149,9 @@ public class CaronaResource {
 		if(!(totalPassageirosESolicitantes < carona.getMaximoPasageiros())){
 			return Response.serverError().entity("Carona já está lotada").build();
 		}
+		if(carona.getMotorista().getEmail().equals(idUsuario) || carona.getPassageiros().contains(usuario)){
+			return Response.serverError().entity("Usuario já participa da carona").build();
+		}
 		
 		Usuario aprovador = carona.getMotorista();
 		
@@ -148,6 +159,7 @@ public class CaronaResource {
 		solicitacao.setAprovador(aprovador.getEmail());
 		solicitacao.setSolicitante(idUsuario);
 		solicitacao.setIdCarona(carona.getId());
+		solicitacao.setIdCaronaPendente(System.currentTimeMillis());
 				
 		List<CaronaPendente> caronasSolicitadas = getCaronasSolicitadas(idCarona);
 		
@@ -165,7 +177,7 @@ public class CaronaResource {
 			}
 		}
 		
-		caronasPendentes.put(System.currentTimeMillis(), solicitacao);
+		caronasPendentes.put(solicitacao.getIdCaronaPendente(), solicitacao);
 		
 		return Response.ok("Solicitação incluída com sucesso").build();
 	}
