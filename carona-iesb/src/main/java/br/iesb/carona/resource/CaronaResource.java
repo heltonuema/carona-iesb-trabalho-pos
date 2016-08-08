@@ -84,7 +84,7 @@ public class CaronaResource {
 	public Response consultaCaronas(@QueryParam("partida") final String partida, @QueryParam("bairroDestino") final String bairroDestino,
 			@QueryParam("localDestino")final String localDestino, @QueryParam("idCarona") final long idCarona){
 
-<<<<<<< HEAD
+
 		Map<Long, Carona> filtradoId = new HashMap<Long,Carona>();
 		if(idCarona != 0l){
 			Carona filtrada = caronas.get(idCarona);
@@ -218,7 +218,7 @@ public class CaronaResource {
 		}
 		
 		caronasPendentes.put(solicitacao.getIdCaronaPendente(), solicitacao);
->>>>>>> refs/heads/desenv
+>>>>>>>> refs/heads/desenv
 		
 		return Response.ok("Solicitação incluída com sucesso").build();
 	}
