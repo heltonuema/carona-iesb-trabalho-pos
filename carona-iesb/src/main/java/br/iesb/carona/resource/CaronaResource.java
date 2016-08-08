@@ -302,7 +302,6 @@ public class CaronaResource {
 				retorno.add(caronaEntry.getValue());
 			}
 		}
-		
 		return Response.ok(retorno).build();
 	}
 	
