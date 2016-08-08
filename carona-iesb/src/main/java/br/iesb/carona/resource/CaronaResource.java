@@ -95,12 +95,10 @@ public class CaronaResource {
 		else{
 			filtradoId = new HashMap<Long,Carona>(caronas);
 		}
-=======
->>>>>>> refs/heads/desenv
-		
-<<<<<<< HEAD
+
+
 		Map<Long, Carona> filtradoPartida = new HashMap<Long, Carona>(filtradoId);
-=======
+
 		List<Carona> filtradoId = new ArrayList<Carona>();
 		if(idCarona != 0l){
 			Carona filtrada = caronas.get(idCarona);
@@ -112,8 +110,7 @@ public class CaronaResource {
 			filtradoId = new ArrayList<Carona>(caronas.values());
 		}
 		
-		List<Carona> filtradoPartida = new LinkedList<Carona>(filtradoId);
->>>>>>> refs/heads/desenv
+
 		if(partida != null && !partida.isEmpty()){
 			List<Carona> auxiliar = new LinkedList<Carona>();
 			for(Carona carona : filtradoPartida){
@@ -166,12 +163,11 @@ public class CaronaResource {
 		if(!(totalPassageirosESolicitantes < carona.getMaximoPasageiros())){
 			return Response.serverError().entity("Carona já está lotada").build();
 		}
-<<<<<<< HEAD
-=======
+
 		if(carona.getMotorista().getEmail().equals(idUsuario) || carona.getPassageiros().contains(usuario)){
 			return Response.serverError().entity("Usuario já participa da carona").build();
 		}
->>>>>>> refs/heads/desenv
+
 		
 		Usuario aprovador = carona.getMotorista();
 		
@@ -179,7 +175,7 @@ public class CaronaResource {
 		solicitacao.setAprovador(aprovador.getEmail());
 		solicitacao.setSolicitante(idUsuario);
 		solicitacao.setIdCarona(carona.getId());
-<<<<<<< HEAD
+
 				
 		List<CaronaPendente> caronasSolicitadas = getCaronasSolicitadas(idCarona);
 		
@@ -198,7 +194,7 @@ public class CaronaResource {
 		}
 		
 		caronasPendentes.put(System.currentTimeMillis(), solicitacao);
-=======
+
 		solicitacao.setIdCaronaPendente(System.currentTimeMillis());
 				
 		List<CaronaPendente> caronasSolicitadas = getCaronasSolicitadas(idCarona);
@@ -218,7 +214,7 @@ public class CaronaResource {
 		}
 		
 		caronasPendentes.put(solicitacao.getIdCaronaPendente(), solicitacao);
->>>>>>>> refs/heads/desenv
+
 		
 		return Response.ok("Solicitação incluída com sucesso").build();
 	}
